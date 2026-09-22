@@ -3,10 +3,10 @@
 #include<sys/socket.h>
 #include<sys/types.h>
 #include<netdb.h>
+#include"common.h"
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <poll.h>
-#define PORT_NUM 8080
 #define BACKLOG 20 
 #define FD_TAB_SIZE 128 
 
@@ -23,6 +23,7 @@ struct header{
     int size;
     char username[128];
     int type;
+    char message[MSG_LEN];
 };
 
 int write_on_socket(int fd, void * buf, int size){
@@ -60,6 +61,10 @@ int read_from_socket(int fd, void * buf, int size){
 
 int main (int argc, char const *argv[])
 {
+    if (argc < 2) {
+		fprintf(stderr, "Error : Invalid arguments.\nUsage: ./server <port>\n");
+		exit(EXIT_FAILURE);
+	}
     int listen_fd = socket(AF_INET, SOCK_STREAM,0); // on a crÃ©Ã© une socket ici
     if (listen_fd == -1){                           // si il y a un problÃ¨me error donc la y a pas d'erreur
         perror("Socket creation:");
@@ -67,7 +72,7 @@ int main (int argc, char const *argv[])
 
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT_NUM);
+    server_addr.sin_port = htons(atoi(argv[1]));
     inet_aton("127.0.0.1", &server_addr.sin_addr);
 
     int yes=1;
@@ -125,9 +130,8 @@ int main (int argc, char const *argv[])
                     fds[i].fd = -1;
                     continue;
                 }
-                char buf[128] = {0};                                        //LE CLIENT LIT MAINTENANT LE MESSAGE SUIVANT DE TAILLE hdr.size
-                ret = read_from_socket(fds[i].fd, buf, hdr.size);   
-                fprintf(stdout, "[%s] (Taille: %d octets) a dit : %s\n", hdr.username, hdr.size, buf);
+                                     
+                fprintf(stdout, "[%s] (Taille: %d octets) a dit : %s\n", hdr.username, hdr.size, hdr.message);
                 // Reset the buffer for the next read
                 //Read data from socket
                 //close socket if needed
