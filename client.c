@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
 				memset(buff, 0, MSG_LEN); // Clear the buffer after reading from stdin
 
 				int new_fd = accept(sfd, NULL, NULL);
-				for(int j = 0; j < FD_TAB_SIZE; j++) {
+				for(int j = 1; j < FD_TAB_SIZE; j++) {
 					if(fds[j].fd == -1) {
 						fds[j].fd = new_fd;
 						fds[j].events = POLLIN;
@@ -145,8 +145,26 @@ int main(int argc, char *argv[]) {
 				}
 			}
 			
-        }
-
+			if (i != 0 && (fds[i].revents & POLLIN)) {
+				printf("Activity on client socket %d\n", fds[i].fd);
+				fds[i].revents = 0;
+				struct header recup = {0};
+				int size_received = 0;
+				while(size_received != sizeof(struct header)) {
+					ret_value = read(fds[i].fd, (char *)(&recup) + size_received, sizeof(struct header) - size_received);
+					if (ret_value == 0) {
+						close(fds[i].fd);
+						fds[i].fd = -1;
+						break;
+					}
+					size_received += ret_value;
+				}
+				if (size_received == sizeof(struct header)) {
+					printf("Received message from %s: %s\n", recup.username, recup.message);
+				}
+			
+        	}
+		}
 	}
 		
 	// sfd = handle_connect();

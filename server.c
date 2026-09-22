@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <poll.h>
+#include <string.h>
+#include <assert.h>
 #define BACKLOG 20 
 #define FD_TAB_SIZE 128 
 
@@ -109,11 +111,14 @@ int main (int argc, char const *argv[])
                 fds[i].revents = 0;                     // On remet la socket d'Ã©coute Ã  0 pour pas qu'elle soit considÃ©rÃ©e comme active lors du prochain poll
                 int new_fd = accept(listen_fd, NULL, NULL); // Accept the new client connection
                 printf("ok\n");             // New client accepted successfully
-                for(int j = 0; j < FD_TAB_SIZE; j++){       // Find an empty slot in the pollfd array
+                
+
+                for(int j = 1; j < FD_TAB_SIZE; j++){       // Find an empty slot in the pollfd array
                     if(fds[j].fd == -1){
                         fds[j].fd = new_fd;
                         fds[j].events = POLLIN;
                         fds[j].revents = 0;             //On initialise les Ã©vÃ©nements retournÃ©s Ã  0 pour ce nouveau client
+
                         break;                    
                     }
                 }
@@ -132,6 +137,10 @@ int main (int argc, char const *argv[])
                 }
                                      
                 fprintf(stdout, "[%s] (Taille: %d octets) a dit : %s\n", hdr.username, hdr.size, hdr.message);
+                int ret2 = -1;
+                ret2 = write(fds[i].fd, &hdr, sizeof(hdr));
+                assert(ret2 != -1);
+        
                 // Reset the buffer for the next read
                 //Read data from socket
                 //close socket if needed
