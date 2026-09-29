@@ -88,8 +88,22 @@ int get_and_send_user_message(int socket_fd) {
 	if (strncmp(message, "/nick ",6) == 0) {
 		char *pseudo = message + 6; // On passe le /nick
 		size_t pseudo_len = strlen(pseudo);
+
+		
 		if (pseudo_len > 0 && pseudo[pseudo_len - 1] == '\n') {
     		pseudo[pseudo_len - 1] = '\0';
+		}
+
+		if (pseudo_len >= NICK_LEN) {
+    		printf("Le pseudo est trop long.\n");
+    		return 1;
+		}
+
+		for (size_t i = 0; i < pseudo_len; i++) {
+    		if (pseudo[i] == ' ') {
+        		printf("Le pseudo ne doit pas contenir d'espace.\n");
+        		return 1;
+    		}
 		}
 		pseudo[pseudo_len] = '\0';
 
