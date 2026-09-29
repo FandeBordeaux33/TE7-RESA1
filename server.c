@@ -14,6 +14,9 @@
 #define MAX_MESSAGE_SIZE 4096
 #define MAX_CLIENTS 128
 
+static char taken_nicknames[MAX_CLIENTS][NICK_LEN];
+static int nickname_count = 0;
+
 int setup_listening_socket(int port) {
 	int listen_fd;
 	int result;
@@ -88,6 +91,27 @@ int handle_client_message(int client_fd) {
 	payload[msg.pld_len] = '\0';
 
 	if (msg.type == NICKNAME_NEW) {
+		for (int i = 0; i < nickname_count; i++) {
+			if (strcmp(taken_nicknames[i], msg.infos) == 0) {
+				struct message response;
+				const char *error_text = "Ce pseudo est deja pris.\n";
+				printf("Pseudo \"%s\" deja pris (client %d).\n", msg.infos, client_fd);
+
+				memset(&response, 0, sizeof(response));
+				response.type = NICKNAME_NEW;
+				response.pld_len = (int)strlen(error_text);
+				write_in_socket(client_fd, &response, sizeof(response));
+				write_in_socket(client_fd, (void *)error_text, (size_t)response.pld_len);
+				return 0;
+			}
+		}
+		if (nickname_count >= MAX_CLIENTS) {
+        	fprintf(stderr, "Limite de pseudos atteinte.\n");
+        return 1;
+    }
+
+		strncpy(taken_nicknames[nickname_count], msg.infos, NICK_LEN - 1);
+		nickname_count++;
 		printf("%s a rejoint le serveur\n", msg.infos);
 		return 0;
 	}
