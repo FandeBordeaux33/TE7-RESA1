@@ -8,9 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include "client_list.h"
 #include <unistd.h>
 
 #define MAX_MESSAGE_SIZE 4096
+static char pseudoactuel[NICK_LEN] = "personne";
 
 int setup_connection(const char *server_ip, const char *server_port) {
 	int socket_fd;
@@ -74,11 +76,34 @@ int get_and_send_user_message(int socket_fd) {
 	message[message_size] = '\0';
 
 	
+
+	
 	if (strcmp(message, "/quit") == 0 || strcmp(message, "/quit\n") == 0) {
 		int quit_size = 5;
 		write_in_socket(socket_fd, &quit_size, sizeof(quit_size));
 		write_in_socket(socket_fd, "/quit", quit_size);
 		return 0;
+	}
+
+	if (strncmp(message, "/nick ",6) == 0) {
+		char *pseudo = message + 6; // On passe le /nick
+		size_t pseudo_len = strlen(pseudo);
+		if (pseudo_len > 0 && pseudo[pseudo_len - 1] == '\n') {
+    		pseudo[pseudo_len - 1] = '\0';
+		}
+		pseudo[pseudo_len] = '\0';
+
+		memset(&msg, 0, sizeof(msg));
+		strncpy(msg.nick_sender, pseudoactuel, NICK_LEN - 1);
+		msg.type = NICKNAME_NEW;
+		strncpy(msg.infos, pseudo, INFOS_LEN - 1);
+
+		if(write_in_socket(socket_fd, &msg, sizeof(msg)) == 0) {
+			return 0;
+		}
+		strncpy(pseudoactuel, pseudo, NICK_LEN - 1);
+		fprintf(stdout, "Votre pseudo est: %s\n", pseudo);
+		return 1;
 	}
 
 	memset(&msg, 0, sizeof(msg));
@@ -88,12 +113,11 @@ int get_and_send_user_message(int socket_fd) {
 	if (write_in_socket(socket_fd, &msg, sizeof(msg)) == 0) {
     	return 0;
 	}
-	
+
 	if (msg.pld_len > 0 && write_in_socket(socket_fd, message, (size_t)msg.pld_len) == 0) {
     	return 0;
 	}
-
-return 1;
+	return 1;
 }
 
 void client_poll_loop(int socket_fd) {

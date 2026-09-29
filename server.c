@@ -76,17 +76,22 @@ int handle_client_message(int client_fd) {
 		fprintf(stderr, "Client %d : Socket close\n", client_fd);
 		return 1;
 	}
-	if (msg.pld_len <= 0 || msg.pld_len > MAX_MESSAGE_SIZE) {
+	if (msg.pld_len < 0 || msg.pld_len > MAX_MESSAGE_SIZE) {
 		fprintf(stderr, "Client %d : Error on message size (%d) \n", client_fd, msg.pld_len);
 		return 1;
 	}
 	// then read the message payload
-	if (read_from_socket(client_fd, payload, msg.pld_len) == 0) {
+	if (msg.pld_len > 0 && read_from_socket(client_fd, payload, msg.pld_len) == 0) {
 		fprintf(stderr, "Client %d : Socket close\n", client_fd);
 		return 1;
 	}
-
 	payload[msg.pld_len] = '\0';
+
+	if (msg.type == NICKNAME_NEW) {
+		printf("%s a rejoint le serveur\n", msg.infos);
+		return 0;
+	}
+
 	if (strcmp(payload, "/quit") == 0) {
 		printf("Client %d requested to quit.\n", client_fd);
 		return 1;
