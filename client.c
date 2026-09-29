@@ -1,4 +1,5 @@
 #include "common.h"
+#include "msg_struct.h"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -38,21 +39,21 @@ int setup_connection(const char *server_ip, const char *server_port) {
 
 /* Return 1 to keep running, or 0 if the server disconnects or sends an invalid message. */
 int read_server_message(int socket_fd) {
-	int message_size;
-	char message[MAX_MESSAGE_SIZE];
+	struct message msg;
+	char payload[MAX_MESSAGE_SIZE];
 
-	if (read_from_socket(socket_fd, &message_size, sizeof(message_size)) == 0) {
+	if (read_from_socket(socket_fd, &msg, sizeof(msg)) == 0) {
 		return 0;
 	}
-	if (message_size <= 0 || message_size > MAX_MESSAGE_SIZE) {
-		fprintf(stderr, "Invalid message size from server: %d\n", message_size);
+	if (msg.pld_len <= 0 || msg.pld_len > MAX_MESSAGE_SIZE) {
+		fprintf(stderr, "Invalid message size from server: %d\n", msg.pld_len);
 		return 0;
 	}
-	if (read_from_socket(socket_fd, message, (size_t)message_size) == 0) {
+	if (read_from_socket(socket_fd, payload, (size_t)msg.pld_len) == 0) {
 		return 0;
 	}
 
-	write(STDOUT_FILENO, message, (size_t)message_size);
+	write(STDOUT_FILENO, payload, (size_t)msg.pld_len);
 	return 1;
 }
 
@@ -61,8 +62,8 @@ int get_and_send_user_message(int socket_fd) {
 	char message[MAX_MESSAGE_SIZE + 1];
 	ssize_t bytes_read;
 	int message_size;
+	struct message msg;
 
-	/* Read up to one message from stdin, then add a terminator for strcmp. */
 	bytes_read = read(STDIN_FILENO, message, MAX_MESSAGE_SIZE);
 	die(bytes_read, "read stdin");
 	if (bytes_read == 0) {
@@ -71,19 +72,28 @@ int get_and_send_user_message(int socket_fd) {
 
 	message_size = bytes_read;
 	message[message_size] = '\0';
+
+	
 	if (strcmp(message, "/quit") == 0 || strcmp(message, "/quit\n") == 0) {
 		int quit_size = 5;
-
 		write_in_socket(socket_fd, &quit_size, sizeof(quit_size));
 		write_in_socket(socket_fd, "/quit", quit_size);
 		return 0;
 	}
 
-	if (write_in_socket(socket_fd, &message_size, sizeof(message_size)) == 0 ||
-		write_in_socket(socket_fd, message, (size_t)message_size) == 0) {
-		return 0;
+	memset(&msg, 0, sizeof(msg));
+	msg.type = ECHO_SEND;
+	msg.pld_len = message_size;
+
+	if (write_in_socket(socket_fd, &msg, sizeof(msg)) == 0) {
+    	return 0;
 	}
-	return 1;
+	
+	if (msg.pld_len > 0 && write_in_socket(socket_fd, message, (size_t)msg.pld_len) == 0) {
+    	return 0;
+	}
+
+return 1;
 }
 
 void client_poll_loop(int socket_fd) {

@@ -1,5 +1,6 @@
 #include "common.h"
 #include "client_list.h"
+#include "msg_struct.h"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -67,31 +68,31 @@ void accept_and_insert_client(int listen_fd, struct pollfd poll_fds[MAX_CLIENTS]
 
 /* Return 1 when the client should be disconnected, 0 after a successful echo. */
 int handle_client_message(int client_fd) {
-	int message_size;
-	char message[MAX_MESSAGE_SIZE + 1];
+	struct message msg;
+	char payload[MAX_MESSAGE_SIZE + 1];
 
 	// first read next message size
-	if (read_from_socket(client_fd, &message_size, sizeof(message_size)) == 0) {
+	if (read_from_socket(client_fd, &msg, sizeof(msg)) == 0) {
 		fprintf(stderr, "Client %d : Socket close\n", client_fd);
 		return 1;
 	}
-	if (message_size <= 0 || message_size > MAX_MESSAGE_SIZE) {
-		fprintf(stderr, "Client %d : Error on message size (%d) \n", client_fd, message_size);
+	if (msg.pld_len <= 0 || msg.pld_len > MAX_MESSAGE_SIZE) {
+		fprintf(stderr, "Client %d : Error on message size (%d) \n", client_fd, msg.pld_len);
 		return 1;
 	}
 	// then read the message payload
-	if (read_from_socket(client_fd, message, message_size) == 0) {
+	if (read_from_socket(client_fd, payload, msg.pld_len) == 0) {
 		fprintf(stderr, "Client %d : Socket close\n", client_fd);
 		return 1;
 	}
 
-	message[message_size] = '\0';
-	if (strcmp(message, "/quit") == 0) {
+	payload[msg.pld_len] = '\0';
+	if (strcmp(payload, "/quit") == 0) {
 		printf("Client %d requested to quit.\n", client_fd);
 		return 1;
 	}
-	if (write_in_socket(client_fd, &message_size, sizeof(message_size)) == 0 ||
-		write_in_socket(client_fd, message, message_size) == 0) {
+	if (write_in_socket(client_fd, &msg, sizeof(msg)) == 0 ||
+		write_in_socket(client_fd, payload, msg.pld_len) == 0) {
 		return 1;
 	}
 	return 0;
