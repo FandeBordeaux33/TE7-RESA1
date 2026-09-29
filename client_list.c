@@ -1,10 +1,12 @@
 #include "client_list.h"
 
 #include <stdlib.h>
+#define NICK_LEN 128
 
 struct client_info {
 	int fd;
 	struct sockaddr_in address;
+	char nickname[NICK_LEN];
 	struct client_info *next;
 };
 
