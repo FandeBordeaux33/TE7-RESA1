@@ -94,11 +94,30 @@ int handle_client_message(int client_fd, struct client_info *clients) {
 
     	while (current != NULL) {						//parcours de la liste des clients jusq'à la fin 
         	if (current->fd == client_fd) {
+				    int premier_pseudo = (current->nickname[0] == '\0');   // test AVANT la copie
+
             	strncpy(current->nickname, msg.infos, sizeof(current->nickname) - 1);
             	current->nickname[sizeof(current->nickname) - 1] = '\0';
-
-            	printf("Client %d : pseudo %s\n",
-                   client_fd, current->nickname);
+				
+			if (premier_pseudo) {
+        		printf(
+					"\n========== CLIENT ==========\n"
+					"[nickname] %s\n"
+					"[socket]   %d\n"
+					"[IP]       %s\n"
+					"[port]     %u\n"
+					"[next]     %p\n"
+					"============================\n",
+					current->nickname,
+					current->fd,
+					inet_ntoa(current->address.sin_addr),
+					(unsigned int)ntohs(current->address.sin_port),
+					(void *)current->next
+        		);
+    		} 
+			else {
+       			printf("Client %d : pseudo changé en %s\n", client_fd, current->nickname);
+    		}
             	return 0;
         	}
         	current = current->next;
