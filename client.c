@@ -1,4 +1,6 @@
 #include "common.h"
+
+#include "client_list.h"
 #include "msg_struct.h"
 
 #include <arpa/inet.h>
@@ -61,6 +63,9 @@ int read_server_message(int socket_fd) {
 
 // Return 1 to keep running, or 0 when stdin closes or the user quits. 
 int get_and_send_user_message(int socket_fd) {
+
+
+	
 	char message[MAX_MESSAGE_SIZE + 1];
 	ssize_t bytes_read;
 	int message_size;
@@ -120,6 +125,19 @@ int get_and_send_user_message(int socket_fd) {
 		return 1;
 	}
 
+	if (strncmp(message, "/who",4) == 0) {
+		printf("Les clients sont : ");
+		memset(&msg, 0, sizeof(msg));
+		strncpy(msg.nick_sender, pseudoactuel, NICK_LEN - 1);
+		msg.type = NICKNAME_LIST;
+
+
+		if(write_in_socket(socket_fd, &msg, sizeof(msg)) == 0) {
+			return 0;
+		}
+		return 1;
+											                   
+	}
 	memset(&msg, 0, sizeof(msg));
 	msg.type = ECHO_SEND;
 	msg.pld_len = message_size;

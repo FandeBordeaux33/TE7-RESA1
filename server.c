@@ -106,6 +106,39 @@ int handle_client_message(int client_fd, struct client_info *clients) {
     	return 1;  // Client introuvable
     }
 
+if (msg.type == NICKNAME_LIST) {
+	struct client_info *current = clients;
+	char liste_noms[MAX_MESSAGE_SIZE];
+	size_t cpt = 0;
+	struct message response;
+
+	while (current != NULL) {
+		if (current->nickname[0] != '\0') {          // on ignore les clients sans pseudo
+			int n = snprintf(liste_noms + cpt, sizeof(liste_noms) - cpt,
+				"%s\n", current->nickname);
+			if (n < 0 || (size_t)n >= sizeof(liste_noms) - cpt) {
+				break;                               // plus de place : on s'arrête
+			}
+			cpt += (size_t)n;                        // on avance du nombre d'octets écrits
+		}
+		current = current->next;
+	}
+
+	if (cpt == 0) {                                  // le client refuse un pld_len de 0
+		cpt = (size_t)snprintf(liste_noms, sizeof(liste_noms), "Aucun utilisateur\n");
+	}
+
+	memset(&response, 0, sizeof(response));
+	response.type = NICKNAME_LIST;
+	response.pld_len = (int)cpt;
+
+	if (write_in_socket(client_fd, &response, sizeof(response)) == 0 ||
+		write_in_socket(client_fd, liste_noms, cpt) == 0) {
+		return 1;                                    // échec d'envoi : on déconnecte
+	}
+	return 0;                                        // succès : on garde le client
+}
+
 	if (strcmp(payload, "/quit") == 0) {
 		printf("Client %d requested to quit.\n", client_fd);
 		return 1;
