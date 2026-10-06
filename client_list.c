@@ -1,14 +1,8 @@
 #include "client_list.h"
 
 #include <stdlib.h>
+#include <netinet/in.h>
 #define NICK_LEN 128
-
-struct client_info {
-	int fd;
-	struct sockaddr_in address;
-	char nickname[NICK_LEN];
-	struct client_info *next;
-};
 
 int client_list_add(struct client_info **clients, int fd, const struct sockaddr_in *address) {
 	struct client_info *client = malloc(sizeof(*client));
@@ -18,6 +12,7 @@ int client_list_add(struct client_info **clients, int fd, const struct sockaddr_
 	client->fd = fd;
 	client->address = *address;
 	client->next = *clients;
+	client->nickname[0] = '\0'; //Initialisation du nickname
 	*clients = client;
 	return 0;
 }

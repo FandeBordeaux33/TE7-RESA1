@@ -14,10 +14,8 @@
 #define MAX_MESSAGE_SIZE 4096
 #define MAX_CLIENTS 128
 
-static char taken_nicknames[MAX_CLIENTS][NICK_LEN];
-static int nickname_count = 0;
 
-int setup_listening_socket(int port) {
+int setup_listening_socket(int port) {					//initialisation connexion 
 	int listen_fd;
 	int result;
 	struct sockaddr_in server_address;
@@ -43,16 +41,16 @@ int setup_listening_socket(int port) {
 void accept_and_insert_client(int listen_fd, struct pollfd poll_fds[MAX_CLIENTS], struct client_info **clients) {
 	struct sockaddr_in client_address;
 	socklen_t client_address_length = sizeof(client_address);
-	int client_fd = accept(listen_fd, (struct sockaddr *)&client_address,
-		&client_address_length);
+	int client_fd = accept(listen_fd, (struct sockaddr *)&client_address, &client_address_length);
 	int slot;
-
 	die(client_fd, "accept");
-	for (slot = 1; slot < MAX_CLIENTS; slot++) {
-		if (poll_fds[slot].fd < 0) {
+
+	for (slot = 1; slot < MAX_CLIENTS; slot++) {								//recherche d'un slot libre
+		if (poll_fds[slot].fd < 0) {											// slot libre trouvé car fd < 0
 			if (client_list_add(clients, client_fd, &client_address) < 0) {
-				close(client_fd);
-				die(-1, "malloc client information");
+    			perror("malloc client information");
+    			close(client_fd);
+    			return;
 			}
 			poll_fds[slot].fd = client_fd;
 			poll_fds[slot].events = POLLIN;
@@ -63,6 +61,7 @@ void accept_and_insert_client(int listen_fd, struct pollfd poll_fds[MAX_CLIENTS]
 			break;
 		}
 	}
+
 	if (slot == MAX_CLIENTS) {
 		fprintf(stderr, "Client limit reached. Closing the new connection.\n");
 		close(client_fd);
@@ -70,7 +69,7 @@ void accept_and_insert_client(int listen_fd, struct pollfd poll_fds[MAX_CLIENTS]
 }
 
 /* Return 1 when the client should be disconnected, 0 after a successful echo. */
-int handle_client_message(int client_fd) {
+int handle_client_message(int client_fd, struct client_info *clients) {
 	struct message msg;
 	char payload[MAX_MESSAGE_SIZE + 1];
 
@@ -90,74 +89,68 @@ int handle_client_message(int client_fd) {
 	}
 	payload[msg.pld_len] = '\0';
 
-	if (msg.type == NICKNAME_NEW) {
-		for (int i = 0; i < nickname_count; i++) {
-			if (strcmp(taken_nicknames[i], msg.infos) == 0) {
-				struct message response;
-				const char *error_text = "Ce pseudo est deja pris.\n";
-				printf("Pseudo \"%s\" deja pris (client %d).\n", msg.infos, client_fd);
+	if (msg.type == NICKNAME_NEW) {		
+    	struct client_info *current = clients;
 
-				memset(&response, 0, sizeof(response));
-				response.type = NICKNAME_NEW;
-				response.pld_len = (int)strlen(error_text);
-				write_in_socket(client_fd, &response, sizeof(response));
-				write_in_socket(client_fd, (void *)error_text, (size_t)response.pld_len);
-				return 0;
-			}
-		}
-		if (nickname_count >= MAX_CLIENTS) {
-        	fprintf(stderr, "Limite de pseudos atteinte.\n");
-        return 1;
+    	while (current != NULL) {						//parcours de la liste des clients jusq'à la fin 
+        	if (current->fd == client_fd) {
+            	strncpy(current->nickname, msg.infos, sizeof(current->nickname) - 1);
+            	current->nickname[sizeof(current->nickname) - 1] = '\0';
+
+            	printf("Client %d : pseudo %s\n",
+                   client_fd, current->nickname);
+            	return 0;
+        	}
+        	current = current->next;
+    	}
+    	return 1;  // Client introuvable
     }
-
-		strncpy(taken_nicknames[nickname_count], msg.infos, NICK_LEN - 1);
-		nickname_count++;
-		printf("%s a rejoint le serveur\n", msg.infos);
-		return 0;
-	}
 
 	if (strcmp(payload, "/quit") == 0) {
 		printf("Client %d requested to quit.\n", client_fd);
 		return 1;
 	}
+
 	if (write_in_socket(client_fd, &msg, sizeof(msg)) == 0 ||
 		write_in_socket(client_fd, payload, msg.pld_len) == 0) {
 		return 1;
 	}
+
 	return 0;
 }
 
-void server_poll_loop(int listen_fd, struct pollfd poll_fds[MAX_CLIENTS],
-		struct client_info **clients) {
+void server_poll_loop(int listen_fd, struct pollfd poll_fds[MAX_CLIENTS], struct client_info **clients) {
 	int running = 1;
 
 	/* Slot 0 is the listener. The other slots contain client sockets. */
-	for (int i = 0; i < MAX_CLIENTS; i++) {
+
+	for (int i = 0; i < MAX_CLIENTS; i++) {			//initialisation des slots de poll_fds
 		poll_fds[i].fd = -1;
 		poll_fds[i].events = 0;
 		poll_fds[i].revents = 0;
 	}
-	poll_fds[0].fd = listen_fd;
-	poll_fds[0].events = POLLIN;
+
+	poll_fds[0].fd = listen_fd;						//initialisation du slot de la socket d'écoute
+	poll_fds[0].events = POLLIN;					//elle est active pour la lecture (nouveaux clients)
 
 	// execute server logic
 	while (running) {
-		int ready = poll(poll_fds, MAX_CLIENTS, -1);
+		int ready = poll(poll_fds, MAX_CLIENTS, -1);								// attente d'événements sur les sockets
 		die(ready, "poll");
 
-		if ((poll_fds[0].revents & POLLIN) != 0) {
-			accept_and_insert_client(listen_fd, poll_fds, clients);
+		if ((poll_fds[0].revents & POLLIN) != 0) {									//un nouveau client arrive on regrade la socket d'écoute
+			accept_and_insert_client(listen_fd, poll_fds, clients);					
 		}
 
-		for (int slot = 1; slot < MAX_CLIENTS; slot++) {
+		for (int slot = 1; slot < MAX_CLIENTS; slot++) {							//on regarde si il y a du mouvement sur les autres sockets
 			short returned_events = poll_fds[slot].revents;
 			int close_connection = 0;
 			if (poll_fds[slot].fd < 0) {
 				continue;
 			}
 
-			if ((returned_events & POLLIN) != 0) {
-				close_connection = handle_client_message(poll_fds[slot].fd);
+			if ((returned_events & POLLIN) != 0) {									
+				close_connection = handle_client_message(poll_fds[slot].fd, *clients);
 			}
 			if ((returned_events & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
 				close_connection = 1;
@@ -188,7 +181,7 @@ void server_poll_loop(int listen_fd, struct pollfd poll_fds[MAX_CLIENTS],
 
 int main(int argc, char **argv) {
 	struct pollfd poll_fds[MAX_CLIENTS];
-	struct client_info *clients = NULL;
+	struct client_info *clients = NULL;				//pointeur vers la liste chaînée des clients connectés. C'est le premier maillon de la liste.
 	int port;
 	int listen_fd;
 
