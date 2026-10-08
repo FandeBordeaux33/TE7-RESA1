@@ -5,14 +5,14 @@
 #define NICK_LEN 128
 
 int client_list_add(struct client_info **clients, int fd, const struct sockaddr_in *address) {
-	struct client_info *client = malloc(sizeof(*client));
+	struct client_info *client = malloc(sizeof(*client));			//on créer le maillon
 	
 	if (client == NULL) {
 		return -1;
 	}
-	client->fd = fd;
+	client->fd = fd;												//on le rempli
 	client->address = *address;
-	client->next = *clients;
+	client->next = *clients;										// on insère le nouveau client au début 
 	client->nickname[0] = '\0'; //Initialisation du nickname
 	client->connected_at = time(NULL); //Initialisation du timestamp de connexion
 	*clients = client;

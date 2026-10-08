@@ -131,7 +131,7 @@ int handle_client_message(int client_fd, struct client_info *clients) {
 
 		while (current != NULL) {
 			if (current->nickname[0] != '\0') {          // on ignore les clients sans pseudo
-				int n = snprintf(liste_noms + cpt, 
+				int n = snprintf(liste_noms + cpt, 		//liste_nom est l'adresse du premier caractère du tableau donc liste_noms[0]. Lorsque on fait + cpt on a &liste_noms[cpt]
 								sizeof(liste_noms) - cpt,
 								"	- %s\n", current->nickname);
 								
@@ -147,7 +147,7 @@ int handle_client_message(int client_fd, struct client_info *clients) {
 			cpt = (size_t)snprintf(liste_noms, sizeof(liste_noms), "Aucun utilisateur\n");
 		}
 
-		memset(&response, 0, sizeof(response));
+		memset(&response, 0, sizeof(response));			// on initialise la structure de réponse à zéro
 		response.type = NICKNAME_LIST;
 		response.pld_len = (int)cpt;
 
