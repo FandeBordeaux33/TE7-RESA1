@@ -63,9 +63,6 @@ int read_server_message(int socket_fd) {
 
 // Return 1 to keep running, or 0 when stdin closes or the user quits. 
 int get_and_send_user_message(int socket_fd) {
-
-
-	
 	char message[MAX_MESSAGE_SIZE + 1];
 	ssize_t bytes_read;
 	int message_size;
@@ -80,9 +77,6 @@ int get_and_send_user_message(int socket_fd) {
 	message_size = bytes_read;
 	message[message_size] = '\0';
 
-	
-
-	
 	if (strcmp(message, "/quit") == 0 || strcmp(message, "/quit\n") == 0) {
 		int quit_size = 5;
 		write_in_socket(socket_fd, &quit_size, sizeof(quit_size));
@@ -124,20 +118,47 @@ int get_and_send_user_message(int socket_fd) {
 		fprintf(stdout, "Votre pseudo est: %s\n", pseudo);
 		return 1;
 	}
+	
+	if (strncmp(message, "/whois ",7) == 0) {
+		char *pseudo = message + 7; 							// On passe le /whois
+		size_t pseudo_len = strlen(pseudo);
 
-	if (strncmp(message, "/who",4) == 0) {
-		printf("Les clients sont : ");
+		if (pseudo_len > 0 && pseudo[pseudo_len - 1] == '\n') {
+    		pseudo[pseudo_len - 1] = '\0';
+		}
+
+		if (pseudo_len >= NICK_LEN) {
+    		printf("Le pseudo est trop long.\n");
+    		return 1;
+		}
+
 		memset(&msg, 0, sizeof(msg));
 		strncpy(msg.nick_sender, pseudoactuel, NICK_LEN - 1);
-		msg.type = NICKNAME_LIST;
-
+		msg.type = NICKNAME_INFOS;
+		strncpy(msg.infos, pseudo, INFOS_LEN - 1);
+		msg.infos[INFOS_LEN - 1] = '\0';
 
 		if(write_in_socket(socket_fd, &msg, sizeof(msg)) == 0) {
 			return 0;
 		}
-		return 1;
-											                   
+		return 1;								                   
 	}
+
+	if (strncmp(message, "/who",4) == 0) {
+		
+		memset(&msg, 0, sizeof(msg));
+		strncpy(msg.nick_sender, pseudoactuel, NICK_LEN - 1);
+		msg.type = NICKNAME_LIST;
+		printf("Les utilisateurs sont \n");
+
+		if(write_in_socket(socket_fd, &msg, sizeof(msg)) == 0) {
+			return 0;
+		}
+		return 1;								                   
+	}
+
+
+
 	memset(&msg, 0, sizeof(msg));
 	msg.type = ECHO_SEND;
 	msg.pld_len = message_size;

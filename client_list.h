@@ -1,6 +1,7 @@
 #ifndef JALON1_CLIENT_LIST_H
 #define JALON1_CLIENT_LIST_H
 
+#include <time.h>
 #include <netinet/in.h>
 #define NICK_LEN 128
 
@@ -9,6 +10,7 @@ struct client_info {
 	struct sockaddr_in address;			// son adresse réseau ( IP + Port )
 	char nickname[NICK_LEN];			//nickname est son pseudo
 	struct client_info *next;			// pointeur vers le prochain client dans la liste chaînée
+	time_t connected_at;
 };
 
 int client_list_add(struct client_info **clients, int fd, const struct sockaddr_in *address);
