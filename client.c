@@ -144,6 +144,86 @@ int get_and_send_user_message(int socket_fd) {
 		return 1;								                   
 	}
 
+	if (strncmp(message, "/msgall ", 8) == 0) {
+		char *msgall_content = message + 8;
+		size_t msgall_len = strlen(msgall_content);
+
+		if (msgall_len > 0 && msgall_content[msgall_len - 1] == '\n') {
+			msgall_content[--msgall_len] = '\0';
+		}
+
+		if (msgall_len == 0) {
+			printf("Usage : /msgall <message>\n");
+			return 1;
+		}
+
+		if (msgall_len > MAX_MESSAGE_SIZE) {
+			printf("Le message est trop long.\n");
+			return 1;
+		}
+
+		memset(&msg, 0, sizeof(msg));
+		strncpy(msg.nick_sender, pseudoactuel, NICK_LEN - 1);
+		msg.type = BROADCAST_SEND;
+		msg.pld_len = (int)msgall_len;
+
+		if (write_in_socket(socket_fd, &msg, sizeof(msg)) == 0) {
+			return 0;
+		}
+
+		if (write_in_socket(socket_fd, msgall_content, msgall_len) == 0) {
+			return 0;
+		}
+
+		return 1;
+	}
+	
+	if (strncmp(message, "/msg ", 5) == 0) {
+		char *pseudo = message + 5;
+		char *texte = strchr(pseudo, ' ');
+
+		if (texte == NULL) {
+			printf("Usage : /msg <pseudo> <message>\n");
+			return 1;
+		}
+
+		*texte = '\0';  // Sépare le pseudo du message.
+		texte++;       // Pointe sur le début du message.
+
+		size_t pseudo_len = strlen(pseudo);
+		size_t texte_len = strlen(texte);
+
+		if (texte_len > 0 && texte[texte_len - 1] == '\n') {
+			texte[--texte_len] = '\0';
+		}
+
+		if (pseudo_len == 0 || texte_len == 0) {
+			printf("Usage : /msg <pseudo> <message>\n");
+			return 1;
+		}
+
+		if (pseudo_len >= NICK_LEN || pseudo_len >= INFOS_LEN ||
+			texte_len > MAX_MESSAGE_SIZE) {
+			printf("Pseudo ou message trop long.\n");
+			return 1;
+		}
+
+		memset(&msg, 0, sizeof(msg));
+		strncpy(msg.nick_sender, pseudoactuel, NICK_LEN - 1);
+		strncpy(msg.infos, pseudo, INFOS_LEN - 1);
+		msg.type = UNICAST_SEND;
+		msg.pld_len = (int)texte_len;
+
+		if (write_in_socket(socket_fd, &msg, sizeof(msg)) == 0 ||
+			write_in_socket(socket_fd, texte, texte_len) == 0) {
+			return 0;
+		}
+
+		return 1;
+	}
+
+
+
 	if (strncmp(message, "/who",4) == 0) {
 		
 		memset(&msg, 0, sizeof(msg));

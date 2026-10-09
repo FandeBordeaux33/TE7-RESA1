@@ -212,8 +212,64 @@ int handle_client_message(int client_fd, struct client_info *clients) {
 
 		return 0;
 	}
+	if (msg.type == BROADCAST_SEND) {
+		printf("Broadcast message received from client %d\n", client_fd);
+		    struct client_info *current = clients;
 
-	
+		while (current != NULL) {
+			if (current->fd != client_fd &&											//pour respecter 2.8
+				current->nickname[0] != '\0') {
+				if (write_in_socket(current->fd, &msg, sizeof(msg)) == 0 ||
+					write_in_socket(current->fd, payload,
+									(size_t)msg.pld_len) == 0) {
+					fprintf(stderr, "Échec d'envoi au client %d\n",
+							current->fd);
+				}
+			}
+			current = current->next;
+		}
+		return 0; 
+	}
+
+	if (msg.type == UNICAST_SEND) {
+		struct client_info *current = clients;
+
+		msg.infos[sizeof(msg.infos) - 1] = '\0';
+
+		while (current != NULL) {
+			if (current->nickname[0] != '\0' &&
+				strcmp(current->nickname, msg.infos) == 0) {
+
+				if (write_in_socket(current->fd, &msg, sizeof(msg)) == 0 ||
+					write_in_socket(current->fd, payload,
+									(size_t)msg.pld_len) == 0) {
+					fprintf(stderr, "Échec d'envoi au client %d\n",
+							current->fd);
+				}
+
+				return 0; 
+			}
+
+			current = current->next;
+		}
+
+		struct message response;
+		char erreur[] = "[Server] : Destinataire introuvable\n";
+
+		memset(&response, 0, sizeof(response));
+		response.type = UNICAST_SEND;
+		strncpy(response.nick_sender, "Server",
+				sizeof(response.nick_sender) - 1);
+		response.pld_len = (int)(sizeof(erreur) - 1);
+
+		if (write_in_socket(client_fd, &response, sizeof(response)) == 0 ||
+			write_in_socket(client_fd, erreur, sizeof(erreur) - 1) == 0) {
+			return 1;
+		}
+
+		return 0;
+	}
+
 
 	if (strcmp(payload, "/quit") == 0) {
 		printf("Client %d requested to quit.\n", client_fd);
