@@ -266,7 +266,6 @@ int handle_client_message(int client_fd, struct client_info *clients) {
 			write_in_socket(client_fd, erreur, sizeof(erreur) - 1) == 0) {
 			return 1;
 		}
-
 		return 0;
 	}
 
