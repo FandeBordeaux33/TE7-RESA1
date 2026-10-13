@@ -89,14 +89,41 @@ int handle_client_message(int client_fd, struct client_info *clients) {
 	}
 	payload[msg.pld_len] = '\0';
 
-	if (msg.type == NICKNAME_NEW) {		
-    	struct client_info *current = clients;			//premier client
-    	while (current != NULL) {						//parcours de la liste des clients jusq'à la fin 
-        	if (current->fd == client_fd) {
-				int premier_pseudo = (current->nickname[0] == '\0');  //vaut 1 si il n'y a pas de pseudo, 0 sinon 
+		if (msg.type == NICKNAME_NEW) {
+		struct client_info *current;
+		struct client_info *other;
 
-            	strncpy(current->nickname, msg.infos, sizeof(current->nickname) - 1); //copie le pseudo de msg.infos dans current->nickname
-            	current->nickname[sizeof(current->nickname) - 1] = '\0';	//on met un \0 pour le %s
+		msg.infos[sizeof(msg.infos) - 1] = '\0';
+
+		for (other = clients; other != NULL; other = other->next) {   // on regarde si le pseudo est deja utilisé autre part
+			if (other->fd != client_fd &&
+				other->nickname[0] != '\0' &&
+				strcmp(other->nickname, msg.infos) == 0) {
+
+				struct message response;
+				char erreur[] = "[Server] : Pseudo déjà utilisé\n";
+
+				memset(&response, 0, sizeof(response));
+				response.type = NICKNAME_NEW;
+				response.pld_len = (int)(sizeof(erreur) - 1);
+
+				if (write_in_socket(client_fd, &response, sizeof(response)) == 0 ||
+					write_in_socket(client_fd, erreur, sizeof(erreur) - 1) == 0) {
+					return 1;
+				}
+				return 0;   
+			}
+		}
+
+		
+		current = clients;
+		while (current != NULL) {   //on ajoute le pleudo
+			if (current->fd == client_fd) {
+				int premier_pseudo = (current->nickname[0] == '\0');    
+
+				strncpy(current->nickname, msg.infos, sizeof(current->nickname) - 1);
+				current->nickname[sizeof(current->nickname) - 1] = '\0';
+
 				if (premier_pseudo) {
 					printf(
 						"\n========== CLIENT ==========\n"
@@ -112,16 +139,16 @@ int handle_client_message(int client_fd, struct client_info *clients) {
 						(unsigned int)ntohs(current->address.sin_port),
 						(void *)current->next
 					);
-				} 
+				}
 				else {
 					printf("Client %d : pseudo changé en %s\n", client_fd, current->nickname);
 				}
-            	return 0;
-        	}
-        	current = current->next;
-    	}
-    	return 1;  // Client introuvable
-    }
+				return 0;
+			}
+			current = current->next;
+		}
+		return 1;  
+	}
 
 	if (msg.type == NICKNAME_LIST) {
 		struct client_info *current = clients;
