@@ -186,10 +186,67 @@ int handle_client_message(int client_fd, struct client_info *clients) {
 	}
 
 	if (msg.type == NICKNAME_INFOS) {
-		struct client_info *current = clients;
+        struct client_info *current = clients;
+        struct message response;
+        char texte[MAX_MESSAGE_SIZE];
+        int n;
+
+        msg.infos[sizeof(msg.infos) - 1] = '\0';
+
+		n = snprintf(texte, sizeof(texte),
+								"[Server] : User not found\n");
+
+		while (current != NULL) {
+				if (current->nickname[0] != '\0' &&
+						strcmp(current->nickname, msg.infos) == 0) {
+
+						char date[32];
+						struct tm *t = localtime(&current->connected_at);
+
+						if (t == NULL ||
+								strftime(date, sizeof(date), "%Y/%m/%d@%H:%M", t) == 0) {
+								return 1;
+						}
+
+						n = snprintf(
+								texte, sizeof(texte),
+								"[Server] : %s connected since %s "
+								"with IP address %s and port number %u\n",
+								current->nickname,
+								date,
+								inet_ntoa(current->address.sin_addr),
+								(unsigned int)ntohs(current->address.sin_port)
+						);
+
+						break;  // Client trouvé : on arrête la recherche.
+				}
+
+				current = current->next;
+		}
+
+		if (n < 0 || (size_t)n >= sizeof(texte)) {
+				return 1;
+		}
+
+		memset(&response, 0, sizeof(response));
+		response.type = NICKNAME_INFOS;
+		response.pld_len = n;
+
+		if (write_in_socket(client_fd, &response, sizeof(response)) == 0 ||
+				write_in_socket(client_fd, texte, (size_t)n) == 0) {
+				return 1;
+		}
+
+		return 0;
+	}
+
+
+	if (msg.type == FILE_REQUEST) {
+		struct client_info *current = clients;    //act
 		struct message response;
 		char texte[MAX_MESSAGE_SIZE];
 		int n;
+		int socket_suiv = -1;
 
 		msg.infos[sizeof(msg.infos) - 1] = '\0';
 
@@ -197,28 +254,8 @@ int handle_client_message(int client_fd, struct client_info *clients) {
 					"[Server] : User not found\n");
 
 		while (current != NULL) {
-			if (current->nickname[0] != '\0' &&
-				strcmp(current->nickname, msg.infos) == 0) {
-
-				char date[32];
-				struct tm *t = localtime(&current->connected_at);
-
-				if (t == NULL ||
-					strftime(date, sizeof(date), "%Y/%m/%d@%H:%M", t) == 0) {
-					return 1;
-				}
-
-				n = snprintf(
-					texte, sizeof(texte),
-					"[Server] : %s connected since %s "
-					"with IP address %s and port number %u\n",
-					current->nickname,
-					date,
-					inet_ntoa(current->address.sin_addr),
-					(unsigned int)ntohs(current->address.sin_port)
-				);
-
-				break;  // Client trouvé : on arrête la recherche.
+			if (current->nickname[0] != '\0' && strcmp(current->nickname, msg.infos) == 0) {
+				socket_suiv = current->fd;
 			}
 
 			current = current->next;
@@ -229,15 +266,17 @@ int handle_client_message(int client_fd, struct client_info *clients) {
 		}
 
 		memset(&response, 0, sizeof(response));
-		response.type = NICKNAME_INFOS;
+		response.type = FILE_REQUEST;
 		response.pld_len = n;
 
-		if (write_in_socket(client_fd, &response, sizeof(response)) == 0 ||
-			write_in_socket(client_fd, texte, (size_t)n) == 0) {
+		if (write_in_socket(socket_suiv, &response, sizeof(response)) == 0 ||
+			write_in_socket(socket_suiv, texte, (size_t)n) == 0) {
 			return 1;
 		}
 
 		return 0;
+
+
 	}
 	if (msg.type == BROADCAST_SEND) {
 		printf("Broadcast message received from client %d\n", client_fd);
@@ -294,7 +333,8 @@ int handle_client_message(int client_fd, struct client_info *clients) {
 			return 1;
 		}
 		return 0;
-	}
+	}	
+		
 
 
 	if (strcmp(payload, "/quit") == 0) {
@@ -309,6 +349,7 @@ int handle_client_message(int client_fd, struct client_info *clients) {
 
 	return 0;
 }
+
 
 void server_poll_loop(int listen_fd, struct pollfd poll_fds[MAX_CLIENTS], struct client_info **clients) {	//argument : socket d'écoute, tableau poll, liste chainée des clients
 	int running = 1;

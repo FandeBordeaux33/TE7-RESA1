@@ -144,6 +144,50 @@ int get_and_send_user_message(int socket_fd) {
 		return 1;								                   
 	}
 
+	if (strncmp(message, "/send ",6) == 0) {
+		char *pseudo = message + 6;
+		char *texte = strchr(pseudo, ' ');
+
+		if (texte == NULL) {
+			printf("Usage : /msg <pseudo> <message>\n");
+			return 1;
+		}
+
+		*texte = '\0';  // Sépare le pseudo du message.
+		texte++;       // Pointe sur le début du message.
+
+		size_t pseudo_len = strlen(pseudo);
+		size_t texte_len = strlen(texte);
+
+		if (texte_len > 0 && texte[texte_len - 1] == '\n') {
+			texte[--texte_len] = '\0';
+		}
+
+		if (pseudo_len == 0 || texte_len == 0) {
+			printf("Usage : /msg <pseudo> <message>\n");
+			return 1;
+		}
+
+		if (pseudo_len >= NICK_LEN || pseudo_len >= INFOS_LEN ||
+			texte_len > MAX_MESSAGE_SIZE) {
+			printf("Pseudo ou message trop long.\n");
+			return 1;}
+
+		memset(&msg, 0, sizeof(msg));
+		strncpy(msg.nick_sender, pseudoactuel, NICK_LEN - 1);
+		msg.type = FILE_REQUEST;
+		strncpy(msg.infos, pseudo, INFOS_LEN - 1);
+		msg.infos[INFOS_LEN - 1] = '\0';
+
+		if(write_in_socket(socket_fd, &msg, sizeof(msg)) == 0) {
+			return 0;
+		}
+		if(write_in_socket(socket_fd, texte, sizeof(texte)) == 0) {
+			return 0;
+		}
+		return 1;								                   
+	}
+
 	if (strncmp(message, "/msgall ", 8) == 0) {
 		char *msgall_content = message + 8;
 		size_t msgall_len = strlen(msgall_content);
