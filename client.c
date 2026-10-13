@@ -177,7 +177,7 @@ int get_and_send_user_message(int socket_fd) {
 
 		return 1;
 	}
-	
+
 	if (strncmp(message, "/msg ", 5) == 0) {
 		char *pseudo = message + 5;
 		char *texte = strchr(pseudo, ' ');
